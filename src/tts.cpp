@@ -34,6 +34,7 @@ HRESULT NotifySink::AudioStart(QWORD) {
 }
 
 HRESULT NotifySink::AudioStop(QWORD) {
+  PostQuitMessage(0);
   return S_OK;
 }
 
@@ -41,7 +42,9 @@ HRESULT NotifySink::Visual(QWORD, WCHAR, WCHAR, DWORD, PTTSMOUTH) {
   return S_OK;
 }
 
-HRESULT TTSContainer::init(std::wstring_view name) {
+HRESULT TTSContainer::init(std::wstring_view name,
+                           std::wstring_view outputFilename)
+{
   HRESULT hr;
 
   TTSMODEINFO ttsModeInfo;
@@ -67,41 +70,46 @@ HRESULT TTSContainer::init(std::wstring_view name) {
     Log::error(L"Failed finding voice {}.", name);
   }
 
-#if 0
-  IAudioFile *audioFile;
-  hr = CoCreateInstance(CLSID_AudioDestFile, nullptr, CLSCTX_ALL,
-                        IID_IAudioFile, (void**)&audioFile);
-  if (FAILED(hr)) {
-    Log::error("Failed creating IAudioFile.");
-    return hr;
+  if (!outputFilename.empty()) {
+    Log::debug("Creating audio file output.");
+
+    _outputFilename = outputFilename;
+    IAudioFile *audioFile;
+    hr = CoCreateInstance(CLSID_AudioDestFile, nullptr, CLSCTX_ALL,
+                          IID_IAudioFile, (void**)&audioFile);
+    if (FAILED(hr)) {
+      Log::error("Failed creating IAudioFile.");
+      return hr;
+    }
+
+    audioFile->RealTimeSet(RealTime);
+
+    _output = audioFile;
+  } else {
+    Log::debug("Creating multimedia device output.");
+
+    IAudioMultiMediaDevice *mmdevice;
+    hr = CoCreateInstance (CLSID_MMAudioDest, NULL, CLSCTX_ALL,
+                           IID_IAudioMultiMediaDevice, (void**)&mmdevice);
+    if (FAILED(hr)) {
+      Log::error("Failed creating IAudioMultiMediaDevice.");
+      return hr;
+    }
+
+    hr = mmdevice->DeviceNumSet(0XFFFFFFFF);
+    if (FAILED(hr)) {
+      Log::error("Failed setting mmdevice number");
+      return hr;
+    }
+
+    // some engines will leak an audio destination object
+    // but if release they crash
+    // mmdevice->AddRef();
+
+    _output = mmdevice;
   }
 
-  audioFile->RealTimeSet(RealTime);
-
-  _audioFile = audioFile;
-#else
-	IAudioMultiMediaDevice *mmdevice;
-	hr = CoCreateInstance (CLSID_MMAudioDest, NULL, CLSCTX_ALL,
-												 IID_IAudioMultiMediaDevice, (void**)&mmdevice);
-	if (FAILED(hr)) {
-		Log::error("Failed creating IAudioMultiMediaDevice.");
-		return hr;
-	}
-
-  hr = mmdevice->DeviceNumSet(0XFFFFFFFF);
-  if (FAILED(hr)) {
-    Log::error("Failed setting mmdevice number");
-    return hr;
-  }
-
-  // some engines will leak an audio destination object
-  // but if release they crash
-  // mmdevice->AddRef();
-
-  _audioFile = mmdevice;
-#endif
-
-  hr = _ttsFind->Select(ttsResult.gModeID, &_ttsCentral, _audioFile);
+  hr = _ttsFind->Select(ttsResult.gModeID, &_ttsCentral, _output);
   if (FAILED(hr)) {
     Log::error("Failed selecting audio file/device.");
     return hr;
@@ -124,9 +132,6 @@ HRESULT TTSContainer::init(std::wstring_view name) {
   _ttsAttributes->PitchGet(&_maxPitch);
   _ttsAttributes->SpeedGet(&_maxSpeed);
 
-  Log::debug("Pitch: [{}, {}]; {}", _minPitch, _maxPitch, _defaultPitch);
-  Log::debug("Speed: [{}, {}]; {}", _minSpeed, _maxSpeed, _defaultSpeed);
-
   return true;
 }
 
@@ -148,7 +153,7 @@ HRESULT TTSContainer::listVoices() const {
   }
   ttsEnum->Release();
 
-  return E_FAIL;
+  return S_OK;
 }
 
 void TTSContainer::say(std::wstring_view text, NotifySink &sink,
@@ -172,7 +177,10 @@ void TTSContainer::say(std::wstring_view text, NotifySink &sink,
 
   DWORD dwRegKey;
   _ttsCentral->Register((void*)&sink, IID_ITTSNotifySink, &dwRegKey);
-  //_audioFile->Set(L"output.wav", 1);
+  if (isFileOutput()) {
+    Log::debug(L"Writing to {}.", _outputFilename);
+    static_cast<IAudioFile *>(_output)->Set(_outputFilename.c_str(), 1);
+  }
 
   _ttsAttributes->PitchSet(pitch);
   _ttsAttributes->SpeedSet(speed);
@@ -191,15 +199,17 @@ void TTSContainer::say(std::wstring_view text, NotifySink &sink,
     TranslateMessage(&msg);
     DispatchMessage(&msg);
   }
-  //_audioFile->Flush();
+  if (isFileOutput()) {
+    static_cast<IAudioFile *>(_output)->Flush();
+  }
 }
 
 TTSContainer::~TTSContainer() {
   if (_ttsFind) {
     _ttsFind->Release();
   }
-  if (_audioFile) {
-    _audioFile->Release();
+  if (_output) {
+    _output->Release();
   }
   if (_ttsAttributes) {
     _ttsAttributes->Release();

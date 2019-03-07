@@ -38,7 +38,12 @@ struct TTSContainer {
   TTSContainer &operator=(const TTSContainer &) = delete;
   ~TTSContainer();
 
-  HRESULT init(std::wstring_view name);
+  /**
+   * \param name Voice name.
+   * \param outputFilename Output filename, or empty to play through the
+   *        speakers.
+   */
+  HRESULT init(std::wstring_view name, std::wstring_view outputFilename);
   HRESULT listVoices() const;
   void say(std::wstring_view text, NotifySink &sink,
            WORD pitch = 0, DWORD speed = 0);
@@ -51,19 +56,34 @@ struct TTSContainer {
     return _ttsAttributes;
   }
 
-  IUnknown *audioFile() const {
-    return _audioFile;
+  IUnknown *output() const {
+    return _output;
+  }
+
+  bool isFileOutput() const {
+    return !_outputFilename.empty();
+  }
+
+  /// \return a tuple of <c>[min pitch, max pitch, default pitch]</c>.
+  std::tuple<WORD, WORD, WORD> pitchInfo() const {
+    return std::make_tuple(_minPitch, _maxPitch, _defaultPitch);
+  }
+
+  /// \return a tuple of <c>[min speed, max speed, default speed]</c>.
+  std::tuple<DWORD, DWORD, DWORD> speedInfo() const {
+    return std::make_tuple(_minSpeed, _maxSpeed, _defaultSpeed);
   }
 
   explicit operator bool() const {
-    return !!_ttsCentral && !!_ttsAttributes && !!_audioFile;
+    return _ttsCentral && _ttsAttributes && _output;
   }
 
 private:
   PITTSFIND _ttsFind = nullptr;
   PITTSCENTRAL _ttsCentral = nullptr;
   PITTSATTRIBUTES _ttsAttributes = nullptr;
-  IUnknown *_audioFile = nullptr;
+  IUnknown *_output = nullptr;
+  std::wstring _outputFilename;
 
   WORD _defaultPitch;
   WORD _minPitch;

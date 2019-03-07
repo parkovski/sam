@@ -49,18 +49,32 @@ struct ScopedSpdlog {
 };
 
 struct CommandLine {
+  bool showHelp = false;
   bool listVoices = false;
+  bool showVoiceInfo = false;
   std::wstring voiceName = L"Sam";
   int pitch = 0;
   int speed = 0;
   std::wstring text;
+  std::wstring outputFilename;
 };
 
 static void showHelp() {
-  Log::info("Help message goes here.");
+  Log::info("sam - MS TTS4 client.");
+  Log::info("Usage: samd [options] {text}...");
+  Log::info("Options:");
+  Log::info("-h        Show help.");
+  Log::info("-l        List voices.");
+  Log::info("-i        Show information for the selected voice.");
+  Log::info("-v <name> Select voice.");
+  Log::info("-p <num>  Set voice pitch.");
+  Log::info("-s <num>  Set voice speed.");
+  Log::info("-o <file> Write output to a file instead of playing directly.");
 }
 
 static bool parseArgs(int argc, wchar_t *argv[], CommandLine &commandLine) {
+  bool parseOptions = true;
+
   for (int i = 1; i < argc; ++i) {
     std::wstring_view arg = argv[i];
     auto len = arg.length();
@@ -68,13 +82,16 @@ static bool parseArgs(int argc, wchar_t *argv[], CommandLine &commandLine) {
       continue;
     }
 
-    if (arg[0] == '-' || arg[0] == '/') {
+    if ((arg[0] == '-' || arg[0] == '/') && parseOptions) {
       switch (arg[1]) {
         case 'h':
-          showHelp();
-          return false;
+          commandLine.showHelp = true;
+          return true;
         case 'l':
           commandLine.listVoices = true;
+          return true;
+        case 'i':
+          commandLine.showVoiceInfo = true;
           break;
         case 'v':
           if (len > 2) {
@@ -107,6 +124,21 @@ static bool parseArgs(int argc, wchar_t *argv[], CommandLine &commandLine) {
             return false;
           }
           break;
+        case 'o':
+          if (len > 2) {
+            commandLine.outputFilename = arg.substr(2);
+          } else if (++i < argc) {
+            commandLine.outputFilename = argv[i];
+          } else {
+            Log::error("Command line: -o without filename.");
+            return false;
+          }
+        case '-':
+          if (arg[0] == '-') {
+            parseOptions = false;
+            break;
+          }
+          [[fallthrough]];
         default:
           Log::error(L"Unrecognized option {}", arg);
           return false;
@@ -121,14 +153,18 @@ static bool parseArgs(int argc, wchar_t *argv[], CommandLine &commandLine) {
 }
 
 int wmain(int argc, wchar_t *argv[]) {
+  ScopedSpdlog _scopedSpdlog;
+  Log::g_logger->set_level(spdlog::level::trace);
+
   CommandLine commandLine;
-  std::wstringstream wss;
   if (!parseArgs(argc, argv, commandLine)) {
     return 1;
   }
 
-  ScopedSpdlog _scopedSpdlog;
-  Log::g_logger->set_level(spdlog::level::trace);
+  if (commandLine.showHelp) {
+    showHelp();
+    return 0;
+  }
 
   RAIIOLEInit oleInit;
   if (!oleInit) {
@@ -146,9 +182,19 @@ int wmain(int argc, wchar_t *argv[]) {
     return 0;
   }
 
-  if (FAILED(hr = tts.init(commandLine.voiceName))) {
+  hr = tts.init(commandLine.voiceName, commandLine.outputFilename);
+  if (FAILED(hr)) {
     Log::critical("Couldn't initialize TTS!");
     return hr;
+  }
+
+  if (commandLine.showVoiceInfo) {
+    auto [minPitch, maxPitch, defPitch] = tts.pitchInfo();
+    auto [minSpeed, maxSpeed, defSpeed] = tts.speedInfo();
+    Log::info("Pitch: min={}; max={}; default={}.", minPitch, maxPitch,
+              defPitch);
+    Log::info("Speed: min={}; max={}; default={}.", minSpeed, maxSpeed,
+              defSpeed);
   }
 
   NotifySink sink;
