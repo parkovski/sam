@@ -13,7 +13,7 @@ endif()
 
 # list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<CONFIG>")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 
 find_package(spdlog CONFIG REQUIRED)
@@ -21,10 +21,8 @@ find_package(fmt CONFIG REQUIRED)
 # find_package(uvw CONFIG REQUIRED)
 # find_package(nlohmann_json CONFIG REQUIRED)
 
-set(DAEMON_SRC daemon.cpp tts.cpp)
-set(CLIENT_SRC client.cpp)
-list(TRANSFORM DAEMON_SRC PREPEND "src/")
-list(TRANSFORM CLIENT_SRC PREPEND "src/")
+set(SOURCES sam.cpp tts.cpp)
+list(TRANSFORM SOURCES PREPEND "src/")
 
 include_directories(${PROJECT_SOURCE_DIR}/include)
 link_libraries(
@@ -35,8 +33,7 @@ link_libraries(
   # uvw
 )
 
-add_executable(samd ${DAEMON_SRC})
-target_include_directories(samd PRIVATE "C:/Program Files (x86)/Microsoft Speech SDK/Include")
-target_link_libraries(samd PRIVATE ole32.lib user32.lib)
-target_compile_options(samd PRIVATE /MT)
-add_executable(samc ${CLIENT_SRC})
+add_executable(sam ${SOURCES})
+target_include_directories(sam PRIVATE "C:/Program Files (x86)/Microsoft Speech SDK/Include")
+target_link_libraries(sam PRIVATE ole32.lib user32.lib)
+target_compile_options(sam PRIVATE /MT)
