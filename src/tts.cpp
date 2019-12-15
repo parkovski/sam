@@ -1,7 +1,13 @@
 #include "sam/tts.h"
 
-NotifySink::NotifySink() noexcept {}
-NotifySink::~NotifySink() {}
+NotifySink::NotifySink() noexcept
+{
+  _finishEvent = CreateEvent(nullptr, true, true, nullptr);
+}
+
+NotifySink::~NotifySink() {
+  CloseHandle(_finishEvent);
+}
 
 HRESULT NotifySink::QueryInterface(REFIID riid, LPVOID *ppv) {
   *ppv = nullptr;
@@ -30,10 +36,12 @@ HRESULT NotifySink::AttribChanged(DWORD) {
 }
 
 HRESULT NotifySink::AudioStart(QWORD) {
+  ResetEvent(_finishEvent);
   return S_OK;
 }
 
 HRESULT NotifySink::AudioStop(QWORD) {
+  SetEvent(_finishEvent);
   PostQuitMessage(0);
   return S_OK;
 }
@@ -182,6 +190,7 @@ void TTSContainer::say(std::wstring_view text, NotifySink &sink,
     static_cast<IAudioFile *>(_output)->Set(_outputFilename.c_str(), 1);
   }
 
+  ResetEvent(sink.finishEvent());
   _ttsAttributes->PitchSet(pitch);
   _ttsAttributes->SpeedSet(speed);
   _ttsCentral->AudioReset();
@@ -191,11 +200,8 @@ void TTSContainer::say(std::wstring_view text, NotifySink &sink,
   _ttsCentral->TextData(CHARSET_TEXT, TTSDATAFLAG_TAGGED, data,
                         nullptr, IID_ITTSBufNotifySink);
 
-  BOOL gotMessage;
   MSG msg;
-  while ((gotMessage = GetMessage(&msg, nullptr, 0, 0)) != 0
-          && gotMessage != -1 && !sink.finished())
-  {
+  while (GetMessage(&msg, nullptr, 0, 0)) {
     TranslateMessage(&msg);
     DispatchMessage(&msg);
   }

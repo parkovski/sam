@@ -19,17 +19,36 @@ public:
   STDMETHOD    (AudioStop)(QWORD);
   STDMETHOD       (Visual)(QWORD, WCHAR, WCHAR, DWORD, PTTSMOUTH);
 
-  void reset() {
-    _finished = false;
+  const HANDLE &finishEvent() const {
+    return _finishEvent;
   }
 
   bool finished() const {
-    return _finished;
+    switch (auto r = WaitForSingleObject(_finishEvent, 0)) {
+      case WAIT_OBJECT_0:
+        return true;
+      case WAIT_TIMEOUT:
+        return false;
+      default:
+        Log::error("Event wait error: WaitForSingleObject returned {} (0x{:X}), GetLastError() = 0x{:X}.", r, r, GetLastError());
+        return true;
+    }
+  }
+
+  bool wait(DWORD milliseconds = INFINITE) const {
+    switch (WaitForSingleObject(_finishEvent, milliseconds)) {
+      case WAIT_OBJECT_0:
+      case WAIT_TIMEOUT:
+        return true;
+      default:
+        Log::error("Event wait error");
+        return false;
+    }
   }
 
 private:
   ULONG _refcnt = 1;
-  bool _finished = false;
+  HANDLE _finishEvent;
 };
 
 struct TTSContainer {
