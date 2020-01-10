@@ -59,12 +59,13 @@ HRESULT TTSContainer::init(std::wstring_view name,
   TTSMODEINFO ttsResult;
 
   memset(&ttsModeInfo, 0, sizeof(TTSMODEINFO));
-  auto count = name.length() * sizeof(wchar_t);
-  if (count > TTSI_NAMELEN - sizeof(wchar_t)) {
-    count = TTSI_NAMELEN - sizeof(wchar_t);
+  auto count = name.length();
+  Log::debug(L"Trying to find voice '{}'...", name);
+  if (count > TTSI_NAMELEN - 1) {
+    count = TTSI_NAMELEN - 1;
   }
-  memcpy(ttsModeInfo.szModeName, name.data(), count);
-  ttsModeInfo.szModeName[count] = 0;
+  memcpy(ttsModeInfo.szModeName, name.data(), count * sizeof(wchar_t));
+  memcpy(ttsModeInfo.szSpeaker, name.data(), count * sizeof(wchar_t));
 
   hr = CoCreateInstance(CLSID_TTSEnumerator, nullptr, CLSCTX_ALL,
                         IID_ITTSFind, (void**)&_ttsFind);
@@ -74,6 +75,15 @@ HRESULT TTSContainer::init(std::wstring_view name,
   }
 
   hr = _ttsFind->Find(&ttsModeInfo, nullptr, &ttsResult);
+  Log::trace(
+    L"TTS find result:\n\tMode: {}\n\tSpeaker: {}\n\tMfg: {}\n"
+      L"\tProduct: {}\n\tStyle: {}",
+    ttsResult.szModeName,
+    ttsResult.szSpeaker,
+    ttsResult.szMfgName,
+    ttsResult.szProductName,
+    ttsResult.szStyle
+  );
   if (FAILED(hr)) {
     Log::error(L"Failed finding voice {}.", name);
   }
