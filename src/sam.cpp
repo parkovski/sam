@@ -195,17 +195,17 @@ static bool parseArgs(int argc, wchar_t *argv[], CommandLine &commandLine) {
           if (level == L"trace") {
             commandLine.logLevel = spdlog::level::trace;
           } else if (level == L"debug") {
-            commandLine.logLevel = spdlog::level::trace;
+            commandLine.logLevel = spdlog::level::debug;
           } else if (level == L"info") {
-            commandLine.logLevel = spdlog::level::trace;
+            commandLine.logLevel = spdlog::level::info;
           } else if (level == L"warn") {
-            commandLine.logLevel = spdlog::level::trace;
+            commandLine.logLevel = spdlog::level::warn;
           } else if (level == L"error") {
-            commandLine.logLevel = spdlog::level::trace;
+            commandLine.logLevel = spdlog::level::err;
           } else if (level == L"critical") {
-            commandLine.logLevel = spdlog::level::trace;
+            commandLine.logLevel = spdlog::level::critical;
           } else if (level == L"off") {
-            commandLine.logLevel = spdlog::level::trace;
+            commandLine.logLevel = spdlog::level::off;
           } else {
             Log::error("Command line: Invalid log level for -V. Expected "
                        "trace, debug, info, warn, error, critical, off.");
