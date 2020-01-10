@@ -7,6 +7,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+if(NOT CMAKE_SIZEOF_VOID_P EQUAL 4 OR NOT WIN32)
+  message(FATAL_ERROR "This program must be built for 32-bit Windows")
+endif()
+
 if(MSVC)
   add_compile_options(-diagnostics:caret)
 endif()

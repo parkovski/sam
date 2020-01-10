@@ -112,7 +112,7 @@ static bool parseArgs(int argc, wchar_t *argv[], CommandLine &commandLine) {
         return true;
       case 'i':
         commandLine.showVoiceInfo = true;
-        break;
+        return true;
       case 0:
         commandLine.inputFromStdin = true;
         break;
@@ -244,7 +244,7 @@ int wmain(int argc, wchar_t *argv[]) {
 #   ifndef NDEBUG
       spdlog::level::trace
 #   else
-      spdlog::level::err
+      spdlog::level::info
 #   endif
   );
 
@@ -252,7 +252,7 @@ int wmain(int argc, wchar_t *argv[]) {
   if (!parseArgs(argc, argv, commandLine)) {
     return 1;
   }
-  if (std::all_of(commandLine.text.cbegin(), commandLine.text.cend(), iswspace)) {
+  if (commandLine.text.empty()) {
     commandLine.inputFromStdin = true;
   }
 
@@ -294,6 +294,7 @@ int wmain(int argc, wchar_t *argv[]) {
               defPitch);
     Log::info("Speed: min={}; max={}; default={}.", minSpeed, maxSpeed,
               defSpeed);
+    return 0;
   }
 
   NotifySink sink;
