@@ -3,3 +3,4 @@ build/
 .clangd/
 compile_commands.json
 Session.vim
+.cache/
