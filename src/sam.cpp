@@ -1,5 +1,4 @@
 #include "sam/tts.h"
-#include "spdlog/common.h"
 
 #include <spdlog/sinks/stdout_color_sinks.h>
 
@@ -74,7 +73,7 @@ struct CommandLine {
 static void showHelp() {
   fmt::print("{}",
     "sam - MS TTS4 client.\n"
-    "Usage: samd [options] {text}...\n"
+    "Usage: sam [options] {text}...\n"
     "Options:\n"
     "-h         Show help.\n"
     "-l         List voices.\n"
@@ -248,6 +247,9 @@ int wmain(int argc, wchar_t *argv[]) {
 #   endif
   );
 
+  SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE),
+                 ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT
+                 | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
   CommandLine commandLine;
   if (!parseArgs(argc, argv, commandLine)) {
     return 1;

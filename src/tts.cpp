@@ -1,4 +1,21 @@
 #include "sam/tts.h"
+#include <sstream>
+#include <iomanip>
+
+std::wstring to_wstr(const GUID &guid) {
+  std::wstringstream s;
+  s << L'{';
+  s << std::hex << std::setfill(L'0')
+    << std::setw(8) << guid.Data1 << L'-'
+    << std::setw(4) << guid.Data2 << L'-'
+    << guid.Data3 << L'-' <<
+    std::setw(2) << guid.Data4[0] << guid.Data4[1] << L'-';
+  for (int i = 2; i < 8; ++i) {
+    s << guid.Data4[i];
+  }
+  s << L'}';
+  return s.str();
+}
 
 NotifySink::NotifySink() noexcept
 {
@@ -9,7 +26,7 @@ NotifySink::~NotifySink() {
   CloseHandle(_finishEvent);
 }
 
-HRESULT NotifySink::QueryInterface(REFIID riid, LPVOID *ppv) {
+STDMETHODIMP NotifySink::QueryInterface(REFIID riid, LPVOID *ppv) {
   *ppv = nullptr;
   if (IsEqualIID(riid, IID_IUnknown) || IsEqualIID(riid, IID_ITTSNotifySink)) {
     *ppv = (LPVOID)this;
@@ -18,11 +35,11 @@ HRESULT NotifySink::QueryInterface(REFIID riid, LPVOID *ppv) {
   return E_NOINTERFACE;
 }
 
-ULONG NotifySink::AddRef() {
+STDMETHODIMP_(ULONG) NotifySink::AddRef() {
   return ++_refcnt;
 }
 
-ULONG NotifySink::Release() {
+STDMETHODIMP_(ULONG) NotifySink::Release() {
   if (_refcnt > 1) {
     return --_refcnt;
   }
@@ -31,11 +48,11 @@ ULONG NotifySink::Release() {
   return 0;
 }
 
-HRESULT NotifySink::AttribChanged(DWORD) {
+STDMETHODIMP NotifySink::AttribChanged(DWORD) {
   return S_OK;
 }
 
-HRESULT NotifySink::AudioStart(QWORD) {
+STDMETHODIMP NotifySink::AudioStart(QWORD) {
   ResetEvent(_finishEvent);
   return S_OK;
 }
@@ -46,7 +63,7 @@ HRESULT NotifySink::AudioStop(QWORD) {
   return S_OK;
 }
 
-HRESULT NotifySink::Visual(QWORD, WCHAR, WCHAR, DWORD, PTTSMOUTH) {
+STDMETHODIMP NotifySink::Visual(QWORD, WCHAR, WCHAR, DWORD, PTTSMOUTH) {
   return S_OK;
 }
 
@@ -164,10 +181,19 @@ HRESULT TTSContainer::listVoices() const {
     return hr;
   }
 
+  using fmt::formatter;
   Log::trace("Enumerating voices:");
   TTSMODEINFO ttsInfo;
   while (!ttsEnum->Next(1, &ttsInfo, nullptr)) {
     Log::info(L"Speaker: {}; Mode: {}", ttsInfo.szSpeaker, ttsInfo.szModeName);
+    Log::debug(L"MfgName: {}; ProductName: {}; Language: {{ID:{} Dialect:{}}}; Style: {}; "
+               L"Age: {}; Gender: {}; Features: {}; EngineID: {}; EngineFeatures: {}; "
+               L"Interfaces: {}; ModeID: {}",
+               ttsInfo.szMfgName, ttsInfo.szProductName,
+               ttsInfo.language.LanguageID, ttsInfo.language.szDialect,
+               ttsInfo.szStyle, ttsInfo.wAge, ttsInfo.wGender,
+               ttsInfo.dwFeatures, to_wstr(ttsInfo.gEngineID), ttsInfo.dwEngineFeatures,
+               ttsInfo.dwInterfaces, to_wstr(ttsInfo.gModeID));
   }
   ttsEnum->Release();
 
